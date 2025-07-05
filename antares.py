@@ -32,6 +32,8 @@ PLAYER_X_SIZE = 50
 PLAYER_Y_SIZE = 80
 PLAYER_SPEED = 5
 PLAYER_TURN_SENSITIVITY = radians(5)
+INTERCEPTOR_SPEED = 7
+INTERCEPTOR_SIZE = 10
 FPS = 60
 
 # Pygame initialization
@@ -120,6 +122,49 @@ class Missile:
         window.blit(rotated_sprite, missile_rect)
 
 
+class Interceptor:
+    def __init__(self, x, y, direction):
+        self.x = x
+        self.y = y
+        self.direction = direction
+        self.sprite = pygame.image.load(os.path.join(SPRITE_DIR, 'missile.png')).convert_alpha()
+
+    def move(self):
+        self.x += INTERCEPTOR_SPEED * cos(self.direction)
+        self.y += INTERCEPTOR_SPEED * sin(self.direction)
+
+    def render(self):
+        rotated_sprite = pygame.transform.rotate(self.sprite, -(degrees(self.direction) + 90))
+        rect = rotated_sprite.get_rect()
+        rect.center = (self.x, self.y)
+        window.blit(rotated_sprite, rect)
+
+
+class Interceptors:
+    def __init__(self):
+        self.interceptors = []
+
+    def add_interceptor(self, x, y, direction):
+        self.interceptors.append(Interceptor(x, y, direction))
+
+    def move(self):
+        for m in self.interceptors[:]:
+            m.move()
+            if m.x < 0 or m.x > WINDOW_X or m.y < 0 or m.y > WINDOW_Y:
+                self.interceptors.remove(m)
+
+    def render(self):
+        for m in self.interceptors:
+            m.render()
+
+    def get_list(self):
+        return self.interceptors
+
+    def remove(self, interceptor):
+        if interceptor in self.interceptors:
+            self.interceptors.remove(interceptor)
+
+
 class Player:
     def __init__(self, x_coordinate, y_coordinate, player_length, player_height, color_tuple, motion_radians):
         self.x = x_coordinate
@@ -135,6 +180,9 @@ class Player:
         transColor = self.sprite.get_at((0, 0))
         self.sprite.set_colorkey(transColor)
         self.sprite.convert_alpha()
+
+    def shoot(self, interceptors):
+        interceptors.add_interceptor(self.x, self.y, self.direction)
 
     def move_forward(self):
         self.x += PLAYER_SPEED * cos(self.direction)
@@ -203,6 +251,7 @@ def game_loop():
                          Missile(WINDOW_X - MISSILE_SIZE, WINDOW_Y - MISSILE_SIZE, MISSILE_SIZE, GREEN),
                          Missile(WINDOW_X - MISSILE_SIZE, 0, MISSILE_SIZE, BLUE),
                          Missile(0, WINDOW_Y - MISSILE_SIZE, MISSILE_SIZE, YELLOW)])
+    interceptors = Interceptors()
     player = Player(floor(WINDOW_X / 2), floor(WINDOW_Y / 2), PLAYER_X_SIZE, PLAYER_Y_SIZE, WHITE, radians(270))
 
     exit_flag = False
@@ -215,6 +264,9 @@ def game_loop():
         # Input process
         events = pygame.event.get()
         key_presses = pygame.key.get_pressed()
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                player.shoot(interceptors)
         if key_presses[pygame.K_UP]:
             player.move_forward()
         if key_presses[pygame.K_RIGHT]:
@@ -229,12 +281,23 @@ def game_loop():
         # Update NPCs
         missiles.move(player.x, player.y)
         missiles.spawn(milliseconds)
+        interceptors.move()
+
+        # Collision detection between interceptors and missiles
+        for interceptor in interceptors.get_list()[:]:
+            for missile in missiles.get_list()[:]:
+                if (abs(interceptor.x - missile.x) < MISSILE_SIZE and
+                        abs(interceptor.y - missile.y) < MISSILE_SIZE):
+                    interceptors.remove(interceptor)
+                    missiles.get_list().remove(missile)
+                    break
 
         # Screen rendering
         window.fill(WHITE)
         background.render()
         player.render()
         missiles.render()
+        interceptors.render()
 
         # Check game event
         if check_lose(player.x, player.y, missiles):
