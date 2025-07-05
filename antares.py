@@ -1,9 +1,8 @@
-import pygame._view
 import pygame
 import os
 from pygame.locals import FULLSCREEN, DOUBLEBUF
 from math import cos, sin, radians, floor, atan2, pi, degrees
-from random import randint, random, getrandbits
+from random import randint, getrandbits
 
 # Game files
 CURRENT_DIR = os.getcwd()
@@ -186,14 +185,22 @@ class EndText:
         window.blit(text2, textRect2)
 
 
-def check_lose(x, y, missiles):
+def check_lose(player, missiles):
+    player_rect = pygame.Rect(player.x, player.y, player.length, player.height)
+
+    if (
+        player_rect.left < 0
+        or player_rect.right > WINDOW_X
+        or player_rect.top < 0
+        or player_rect.bottom > WINDOW_Y
+    ):
+        return True
+
     for missile in missiles.get_list():
-        if ((missile.x <= x <= missile.x + 20 and missile.y <= y <= missile.y + 20) or
-                (missile.x <= x + 10 <= missile.x + 20 and missile.y <= y <= missile.y + 20) or
-                (missile.x <= x <= missile.x + 20 and missile.y <= y + 10 <= missile.y + 20) or
-                (missile.x <= x + 10 <= missile.x + 20 and missile.y <= y + 10 <= missile.y + 20) or
-                (x < 0) or (x + 10 > WINDOW_X) or (y < 0) or (y + 10 > WINDOW_Y)):
-            return True  # Returns True when any of the missile collides with the player or player touches boundary
+        missile_rect = pygame.Rect(missile.x, missile.y, missile.size, missile.size)
+        if player_rect.colliderect(missile_rect):
+            return True
+    return False
 
 
 def game_loop():
@@ -237,7 +244,7 @@ def game_loop():
         missiles.render()
 
         # Check game event
-        if check_lose(player.x, player.y, missiles):
+        if check_lose(player, missiles):
             exit_flag = True
 
         pygame.display.flip()
